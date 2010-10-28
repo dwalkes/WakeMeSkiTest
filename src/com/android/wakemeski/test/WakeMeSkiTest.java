@@ -1,3 +1,18 @@
+/*
+ * Copyright (C) 2010 Dan Walkes, Andy Doan
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.android.wakemeski.test;
 
 import java.util.ArrayList;
@@ -17,8 +32,9 @@ import com.android.wakemeski.core.WakeMeSkiServer;
 
 /**
  * Tests the location finder class and all locations
+ * Creates a report with detail about the status of all resorts including
+ * any error conditions.
  * @author dan
- *
  */
 public class WakeMeSkiTest extends AndroidTestCase {
 
@@ -31,10 +47,17 @@ public class WakeMeSkiTest extends AndroidTestCase {
 	private ArrayList<String>[] mFreshSnowNotFound = ( ArrayList<String>[]) new ArrayList[mMaxServers];
 	private ArrayList<String>[] mSuccessLocations = ( ArrayList<String>[])new ArrayList[mMaxServers];
 	
+	/**
+	 * Initialize the test fixture to start testing with the first available server
+	 */
 	protected void setUp() {
 		initServer(0);
 	}
 	
+	/**
+	 * On completion, look for errors logged by the server.  Log a summary
+	 * and throw an assertion exception if errors were found.
+	 */
 	protected void tearDown() {
 		String SUMMARY_TAG = new String("WakeMeSkiTest:Summary");
 		int errors = 0;
@@ -67,6 +90,12 @@ public class WakeMeSkiTest extends AndroidTestCase {
 		Assert.assertEquals(0,errors);
 	}
 	
+	/**
+	 * Initialize the specified zero reference server number
+	 * as found in HttpUtils.SERVER_LIST
+	 * @param index Into the server list
+	 * @return true if this is a valid index
+	 */
 	boolean initServer(int index) {
 		boolean initSuccess = false;
 		if( index < HttpUtils.SERVER_LIST.length ) {
@@ -86,12 +115,17 @@ public class WakeMeSkiTest extends AndroidTestCase {
 	}
 
 	/**
-	 * @return true if a new server is setup for test
+	 * @return true if a new server is setup for test, false if no more servers
+	 * are available
 	 */
 	boolean nextServer() {
 		return initServer(mServerIndex+1);
 	}
 	
+	/**
+	 * @param condition to check
+	 * @param errorIfTrue error message if condition fails
+	 */
 	private void expectFalse( boolean condition, String errorIfTrue )
 	{
 		if( condition ) {
@@ -100,10 +134,16 @@ public class WakeMeSkiTest extends AndroidTestCase {
 		}
 	}
 	
+	
+	/**
+	 * @param condition to check
+	 * @param errorIfFalse error message if condition check fails
+	 */
 	private void expectTrue( boolean condition, String errorIfFalse )
 	{
 		expectFalse(!condition,errorIfFalse);
 	}
+	
 	
 	private void expectEquals( int expected, int actual, String errorIfNoMatch )
 	{
@@ -111,8 +151,7 @@ public class WakeMeSkiTest extends AndroidTestCase {
 	}
 
 	/**
-	 * 
-	 * @param location
+	 * @param location The ski resort location to test
 	 */
 	private void testLocation(Location location) {
 		boolean hasProblems;
@@ -136,6 +175,10 @@ public class WakeMeSkiTest extends AndroidTestCase {
 		 */
 	}
 	
+	/**
+	 * @param region The region to test.  Test all locations in this region
+	 * @throws Throwable
+	 */
 	private void testRegion(String region) throws Throwable {
 		Location locations[] = mFinder.getLocations(region);
 		expectTrue(locations.length > 0,"Expect at least 1 location per region but found 0 in region " + region);
@@ -145,6 +188,10 @@ public class WakeMeSkiTest extends AndroidTestCase {
 		}
 	}
 
+	/**
+	 * Test all locations and all servers
+	 * @throws Throwable
+	 */
 	public void testLocations() throws Throwable {
 		do
 		{
