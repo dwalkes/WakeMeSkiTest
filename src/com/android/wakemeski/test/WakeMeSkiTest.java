@@ -37,21 +37,77 @@ import com.android.wakemeski.core.WakeMeSkiServer;
  * @author dan
  */
 public class WakeMeSkiTest extends AndroidTestCase {
+	/*
+	 * If you just deployed an update to the server and want to test it you need to run without cache.
+	 * Otherwise if running in an overnight script or doing test development you could potentially 
+	 * disable this setting and use the cache if available.  Tests will run faster when using cache 
+	 */
+	private boolean mNoCache = true;
+	
+	private static final String OVERRIDE_SERVER = "" 
+	/**
+	 * Un-comment line below to test only on a specific server
+	 */
+	//									+ "http://ddubtech.com/wakemeski/skireport"
+	;
 
 	private int mServerIndex = 0;
 	private WakeMeSkiServer mServer;
 	private LocationFinder	mFinder;
 	private static final String TAG = "WakeMeSkiTest";
+	private static final String SUMMARY_TAG = "WakeMeSkiTest:Summary";
 	private static final int mMaxServers = HttpUtils.SERVER_LIST.length;
-	private ArrayList<String>[] mErrors = ( ArrayList<String>[]) new ArrayList[mMaxServers];
-	private ArrayList<String>[] mFreshSnowNotFound = ( ArrayList<String>[]) new ArrayList[mMaxServers];
-	private ArrayList<String>[] mSuccessLocations = ( ArrayList<String>[])new ArrayList[mMaxServers];
+	/**
+	 * Keep a list of general errors per server
+	 */
+	private ArrayList<String>[] mErrorStrings = ( ArrayList<String>[]) new ArrayList[mMaxServers];
+	/**
+	 * Keep track of reports per server that have errors 
+	 */
+	private ArrayList<Report>[] mErrorReports = ( ArrayList<Report>[]) new ArrayList[mMaxServers];
+
+	/**
+	 * Keep track of Reports that don't have errors but are missing fresh snow totals
+	 */
+	private ArrayList<Report>[] mFreshSnowNotFoundReports = ( ArrayList<Report>[]) new ArrayList[mMaxServers];
+	
+	/**
+	 * Keep track of locations where all resort checks succeeded during test
+	 */
+	private ArrayList<Location>[] mSuccessLocations = ( ArrayList<Location>[])new ArrayList[mMaxServers];
 	
 	/**
 	 * Initialize the test fixture to start testing with the first available server
 	 */
 	protected void setUp() {
 		initServer(0);
+	}
+	
+	/**
+	 * 
+	 * @param report
+	 * @param messagePrefix
+	 */
+	void logReportFailure(Report report, String messagePrefix ) {
+		/*
+		 * Start with the name of the resort
+		 */
+		String logString = report.getResort().toString() + " ";
+		
+		/*
+		 * Add any URL's which might help us track down the problem.  We can
+		 * grab these in a script running against the log output and include in the error report
+		 * to make debugging easier.
+		 */
+		if( report.getFreshSourceURL().length() != 0 ) {
+			logString += "Fresh Source URL: " + report.getFreshSourceURL();
+		}
+		
+		/*
+		 * Add additional tag to message to make it easier to pull out of the logs
+		 * for additional processing
+		 */
+		Log.e(SUMMARY_TAG + ":REPORT_FAILURE",messagePrefix + " : " + logString);
 	}
 	
 	/**
@@ -62,32 +118,62 @@ public class WakeMeSkiTest extends AndroidTestCase {
 		String SUMMARY_TAG = new String("WakeMeSkiTest:Summary");
 		int errors = 0;
 		for( int i=0; i<mMaxServers ;i++ ) {
-			if(mErrors[i] != null && mErrors[i].size() != 0 ) {
-				Log.e(SUMMARY_TAG,"Expected no errors running test on server " +
-					HttpUtils.SERVER_LIST[i] + " but " + mErrors[i].size() + " errors occurred:");
-				for( String error : mErrors[i]) {
-					Log.e(SUMMARY_TAG,error);
+			Log.i(SUMMARY_TAG,"Results for server " + HttpUtils.SERVER_LIST[i]);
+			/**
+			 * Look for general errors first
+			 */
+			if(mErrorStrings[i] != null && mErrorStrings[i].size() != 0 ) {
+				Log.e(SUMMARY_TAG,"Expected no errors " +
+					  " but " + mErrorStrings[i].size() + " errors occurred:");
+				for( String string : mErrorStrings[i]) {
+					Log.e(SUMMARY_TAG,string);
 				}
-				errors += mErrors[i].size();
+				errors += mErrorStrings[i].size();
 			}
-			if( mFreshSnowNotFound[i] != null &&
-					mFreshSnowNotFound[i].size() != 0 ) {
-				Log.e(SUMMARY_TAG,"Total of " +mFreshSnowNotFound[i].size() + " resorts missing fresh snow totals on server " + HttpUtils.SERVER_LIST[i] + " despite lack of error conditions");
+			/**
+			 * Then look for reports with error 
+			 */
+			if(mErrorReports[i] != null && mErrorReports[i].size() != 0 ) {
+				Log.e(SUMMARY_TAG,"Expected no reports with error but " + mErrorReports[i].size() + " have error conditions" );
+				for( Report report : mErrorReports[i]) {
+					logReportFailure(report,report.getError());
+				}
+				errors+= mErrorReports[i].size();
+			}
+			/**
+			 * Then reports that don't have error but also don't have a readable fresh snow total
+			 */
+			if( mFreshSnowNotFoundReports[i] != null &&
+					mFreshSnowNotFoundReports[i].size() != 0 ) {
+				Log.e(SUMMARY_TAG,"Total of " +mFreshSnowNotFoundReports[i].size() + " reports missing fresh snow totals despite lack of error conditions");
 				
-				for( String location : mFreshSnowNotFound[i]) {
-					Log.e(SUMMARY_TAG,location);
+				for( Report report : mFreshSnowNotFoundReports[i]) {
+					logReportFailure(report,"Fresh Snow Not Found");
 				}
+				errors += mFreshSnowNotFoundReports[i].size();
 			}
+			/**
+			 * Finally, log info message with successful locations
+			 */
 			if( mSuccessLocations[i] != null && 
 					mSuccessLocations[i].size() != 0 ) {
 				Log.i(SUMMARY_TAG,"Total of " + mSuccessLocations[i].size()+ " resorts with no problems found on server " + HttpUtils.SERVER_LIST[i]);
-				for( String location : mSuccessLocations[i]) {
-					Log.i(SUMMARY_TAG,location);
+				for( Location location : mSuccessLocations[i]) {
+					Log.i(SUMMARY_TAG,location.toString());
 				}
 			}
 		}
 
 		Assert.assertEquals(0,errors);
+
+	}
+
+	void initServer(String url)
+	{
+		Log.i(TAG, "Testing server" + url );
+		mServer = new WakeMeSkiServer(url); 
+		mFinder = new LocationFinder(
+				mServer);
 	}
 	
 	/**
@@ -98,18 +184,25 @@ public class WakeMeSkiTest extends AndroidTestCase {
 	 */
 	boolean initServer(int index) {
 		boolean initSuccess = false;
-		if( index < HttpUtils.SERVER_LIST.length ) {
-			mServerIndex = index;
-			String server = HttpUtils.SERVER_LIST[mServerIndex];
-			Log.i(TAG, "Testing server" + server );
-			mErrors[index] = new ArrayList<String>();
-			mFreshSnowNotFound[index] = new ArrayList<String>();
-			mSuccessLocations[index] = new ArrayList<String>();
-	
-			mServer = new WakeMeSkiServer(server); 
-			mFinder = new LocationFinder(
-					mServer);
-			initSuccess = true;
+
+		if(OVERRIDE_SERVER.length() != 0) {
+			if(index == 0) {
+				initServer(OVERRIDE_SERVER);
+			} else {
+				initSuccess = false;
+			}
+		} else {
+			if(index < HttpUtils.SERVER_LIST.length) {
+				mServerIndex = index;
+				initServer(HttpUtils.SERVER_LIST[mServerIndex]);
+				initSuccess=true;
+			}
+		}
+		if(initSuccess) {
+			mErrorStrings[index] = new ArrayList<String>();
+			mErrorReports[index] = new ArrayList<Report>();
+			mFreshSnowNotFoundReports[index] = new ArrayList<Report>();
+			mSuccessLocations[index] = new ArrayList<Location>();
 		}
 		return initSuccess;
 	}
@@ -130,7 +223,7 @@ public class WakeMeSkiTest extends AndroidTestCase {
 	{
 		if( condition ) {
 			Log.e(TAG, errorIfTrue);
-			mErrors[mServerIndex].add(errorIfTrue);
+			mErrorStrings[mServerIndex].add(errorIfTrue);
 		}
 	}
 	
@@ -149,29 +242,35 @@ public class WakeMeSkiTest extends AndroidTestCase {
 	{
 		expectTrue(expected==actual,errorIfNoMatch + " Expected " + expected + " but found " + actual );
 	}
+	
 
 	/**
 	 * @param location The ski resort location to test
 	 */
 	private void testLocation(Location location) {
-		boolean hasProblems;
 		Log.i(TAG,"Testing location " + location);
 		Resort resort = new Resort(location);
-		Report r = Report.loadReport(getContext(), 
-				(ConnectivityManager)getContext().getSystemService((Context.CONNECTIVITY_SERVICE)), resort, mServer);
-		hasProblems = r.hasErrors();
-		expectFalse(r.hasErrors(),location + " has errors " + r.getError());
-		if( !hasProblems ) {
+		Report r;
+		if( mNoCache ) {
+			r = Report.loadReportNoCache(getContext(), 
+					(ConnectivityManager)getContext().getSystemService((Context.CONNECTIVITY_SERVICE)), resort, mServer);
+		} else {
+			r = Report.loadReport(getContext(), 
+					(ConnectivityManager)getContext().getSystemService((Context.CONNECTIVITY_SERVICE)), resort, mServer);
+		}
+
+		if( !r.hasErrors() ) {
 			if( !r.hasFreshSnowTotal() ) {
-				mFreshSnowNotFound[mServerIndex].add(location.toString());
-				hasProblems = true;
+				mFreshSnowNotFoundReports[mServerIndex].add(r);
+			} else {
+				mSuccessLocations[mServerIndex].add(r.getResort().getLocation());
 			}
+		} else {
+			mErrorReports[mServerIndex].add(r);
 		}
-		if( !hasProblems ) {
-			mSuccessLocations[mServerIndex].add(location.toString());
-		}
+		
 		/**
-		 * TODO: more testing of this location
+		 * TODO: more testing of this report
 		 */
 	}
 	
