@@ -79,7 +79,7 @@ public class WakeMeSkiTest extends AndroidTestCase {
 			if( OVERRIDE_SERVER.length() != 0 ) {
 				server = OVERRIDE_SERVER;
 			} else {
-				server = HttpUtils.SERVER_LIST[i];
+				server = WakeMeSkiServer.SERVER_LIST[i];
 			}
 			Log.i(SUMMARY_TAG,"Results for server " + server );
 			
@@ -117,9 +117,9 @@ public class WakeMeSkiTest extends AndroidTestCase {
 				initSuccess = false;
 			}
 		} else {
-			if(index < HttpUtils.SERVER_LIST.length) {
+			if(index < WakeMeSkiServer.SERVER_LIST.length) {
 				mServerIndex = index;
-				initServer(HttpUtils.SERVER_LIST[mServerIndex]);
+				initServer(WakeMeSkiServer.SERVER_LIST[mServerIndex]);
 				initSuccess=true;
 			}
 		}
