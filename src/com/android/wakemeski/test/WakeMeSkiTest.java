@@ -23,7 +23,6 @@ import android.net.ConnectivityManager;
 import android.test.AndroidTestCase;
 import android.util.Log;
 
-import com.android.wakemeski.core.HttpUtils;
 import com.android.wakemeski.core.Location;
 import com.android.wakemeski.core.LocationFinder;
 import com.android.wakemeski.core.Report;
@@ -95,7 +94,7 @@ public class WakeMeSkiTest extends AndroidTestCase {
 	void initServer(String url)
 	{
 		Log.i(TAG, "Testing server" + url );
-		mServer = new WakeMeSkiServer(url); 
+		mServer = new WakeMeSkiServer(this.getContext(),url); 
 		mFinder = new LocationFinder(
 				mServer);
 		mServerResult = new ServerTestResult(mServer);

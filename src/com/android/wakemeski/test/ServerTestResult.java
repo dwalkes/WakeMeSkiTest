@@ -106,7 +106,7 @@ public class ServerTestResult {
 		if( mErrorReports.size() != 0 ) {
 			Log.e(tag,"Expected no reports with error but " + mErrorReports.size() + " have error conditions" );
 			for( Report report : mErrorReports ) {
-				logReportFailure(tag,report,report.getError());
+				logReportFailure(tag,report,report.getNonLocalizedError());
 			}
 		}
 		/**
