@@ -16,6 +16,7 @@
 package com.android.wakemeski.test;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 
 import junit.framework.Assert;
 import android.content.Context;
@@ -49,6 +50,15 @@ public class WakeMeSkiTest extends AndroidTestCase {
 	 */
 	//								+ "http://ddubtech.com/wakemeski/skireport"
 	;
+
+	/**
+	 * List regions with issues.  On a region with issues, don't attempt other locations when
+	 * the first location fails (otherwise the test takes a long time to run)
+	 */
+	private static final String[] mProblemRegions = 
+	{
+									"Montana"
+	};
 
 	private int mServerIndex = 0;
 	private WakeMeSkiServer mServer;
@@ -94,7 +104,7 @@ public class WakeMeSkiTest extends AndroidTestCase {
 	void initServer(String url)
 	{
 		Log.i(TAG, "Testing server" + url );
-		mServer = new WakeMeSkiServer(this.getContext(),url); 
+		mServer = new WakeMeSkiTestServer(this.getContext(),url); 
 		mFinder = new LocationFinder(
 				mServer);
 		mServerResult = new ServerTestResult(mServer);
@@ -171,8 +181,9 @@ public class WakeMeSkiTest extends AndroidTestCase {
 
 	/**
 	 * @param location The ski resort location to test
+	 * @return the report for this location
 	 */
-	private void testLocation(Location location) {
+	private Report testLocation(Location location) {
 		Log.i(TAG,"Testing location " + location);
 		Resort resort = new Resort(location);
 		Report r;
@@ -188,6 +199,7 @@ public class WakeMeSkiTest extends AndroidTestCase {
 		 * Process the report and cache any error conditions
 		 */
 		mServerResult.processReport(r);
+		return r;
 		
 	}
 	
@@ -200,7 +212,15 @@ public class WakeMeSkiTest extends AndroidTestCase {
 		expectTrue(locations.length > 0,"Expect at least 1 location per region but found 0 in region " + region);
 		Log.i(TAG, "Found " + locations.length + " locations in region " + region);
 		for (Location location:locations) {
-			testLocation(location);
+			Report report = testLocation(location);
+			if( Arrays.asList(mProblemRegions).contains(region) ) {
+				if( report.hasErrors() ) {
+					Log.i(TAG,"Skipping all additional locations in Region " + region + " as it is identified as a problem region");
+					break;
+				} else {
+					Log.i(TAG,"Region " + region + " appears to be working again!! at least for location " + location);
+				}
+			}
 		}
 	}
 
@@ -212,8 +232,9 @@ public class WakeMeSkiTest extends AndroidTestCase {
 		do
 		{
 			String[] regions = mFinder.getRegions(); 
-			expectEquals(9,regions.length,"regions.length did not match expected value");
+			expectEquals(10,regions.length,"regions.length did not match expected value");
 			for (String region:regions) {
+				
 				testRegion(region);
 			}
 		} while (nextServer());

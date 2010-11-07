@@ -138,12 +138,18 @@ public class ServerTestResult {
 		mErrorStrings.add(error);
 	}
 	
-	public void processReport(Report r) {
+	/**
+	 * @param r report to process
+	 * @return true of no errors were found, false if errors were found
+	 */
+	public boolean processReport(Report r) {
+		boolean processSuccess = false;
 		if( !r.hasErrors() ) {
 			if( !r.hasFreshSnowTotal() ) {
 				mFreshSnowNotFoundReports.add(r);
 			} else {
 				mSuccessLocations.add(r);
+				processSuccess =  true;
 			}
 		} else {
 			mErrorReports.add(r);
@@ -151,7 +157,9 @@ public class ServerTestResult {
 		/**
 		 * TODO: more testing of this report
 		 */
+		return processSuccess;
 	}
 	
+
 	
 }
